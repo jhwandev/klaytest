@@ -4,7 +4,7 @@ const URL = 'https://api.baobab.klaytn.net:8651'
 const NETWORK_ID = '1001'
 const GASLIMIT = '8500000'
 
-const PRIVATE_KEY = '0x7780c219af9edc38f9599ca77b3989c93ffd853f6fe2704550822f554e138517'
+const PRIVATE_KEY = '0xcd534c5b118e8865ffc4632b3473729492782f5c0fb644afada463bc2252e4fc'
 
 module.exports = {
     networks : {
