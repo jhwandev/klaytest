@@ -66,10 +66,35 @@ const App = {
   },
 
   generateNumbers: async function () {
+    var num1 = Math.floor((Math.random() * 50) + 10);
+    var num2 = Math.floor((Math.random() * 50) + 10);
+    sessionStorage.setItem('result', num1 + num2);
 
+    $('#start').hide();
+    $('#start').hide();
+    $('#num1').text(num1);
+    $('#num2').text(num2);
+    $('#question').show();
+    document.querySelector('#answer').focus();
+
+    this.showTimer();
   },
 
   submitAnswer: async function () {
+    const result = sessionStorage.getItem('result');
+    var answer = $('#answer').val();
+
+    if(answer === result){
+      if (confirm("정답! 0.1 KLAY 받기")){
+        if (await this.callContractBalance() >= 0.1){
+          this.receiveKlay();
+        }else{
+          alert('컨트랙 계정에 klay가 없습니다.')
+        }
+      }
+    }else{
+      alert('땡!')
+    }
 
   },
 
@@ -79,7 +104,7 @@ const App = {
 
     if (walletInstance) {
       if ((await this.callOwner()).toUpperCase() !== walletInstance.address.toUpperCase()){
-        alert('Owner 계정이 아닙니다.')
+        alert('Owner 가 아님.')
         return; 
       } 
       else {
@@ -90,19 +115,22 @@ const App = {
             from: walletInstance.address,
             gas: '200000',
             value: cav.utils.toPeb(amount, "KLAY")
-          })        
-          .once('transactionHash', (txHash) => {
-            console.log(`txHash: ${txHash}`);
           })
-          .once('receipt', (receipt) => {
-            console.log(`(#${receipt.blockNumber})`, receipt); //Received receipt! It means your transaction(calling plus function) is in klaytn block                          
+          .then(receipt => {
+            console.log(receipt);
+            if (receipt.status){
+              alert(amount + " KLAY를 컨트랙에 송금했습니다.");               
+              location.reload();
+            } else{
+              alert("컨트랙트 실패.");               
+            }
             spinner.stop();  
-            alert(amount + " KLAY를 컨트랙에 송금했습니다.");               
-            location.reload();      
           })
-          .once('error', (error) => {
-            alert(error.message);
-          }); 
+          .catch(err => {
+            alert(err.message)
+            spinner.stop();  
+          })        
+
         }
         return;    
       }
@@ -151,6 +179,7 @@ const App = {
     $('#loginModal').modal('hide');
     $("#login").hide(); 
     $('#logout').show();
+    $('#game').show();
     $('#address').append('<br>' + '<p>' + '내 계정 주소: ' + walletInstance.address + '</p>');   
     $('#contractBalance').append('<p>' + '이벤트 잔액: ' + cav.utils.fromPeb(await this.callContractBalance(), "KLAY") + ' KLAY' + '</p>');     
 
@@ -169,6 +198,19 @@ const App = {
 
   showTimer: function () {
 
+    var seconds = 5;
+    $('#timer').text(seconds);
+
+    var interval = setInterval(() => {
+      $('#timer').text(--seconds);
+      if(seconds <= 0){
+        $('#timer').text('');
+        $('#answer').val('');
+        $('#question').hide();
+        $('#start').show();
+        clearInterval(interval)
+      }
+    }, 1000);
   },
 
   showSpinner: function () {
@@ -177,6 +219,28 @@ const App = {
   },
 
   receiveKlay: function () {
+    var spinner = this.showSpinner();
+    const walletInstance = this.getWallet();
+
+    if(!walletInstance) return;
+
+    agContract.methods.transfer(cav.utils.toPeb("0.1","KLAY")).send({
+      from: walletInstance.address,
+      gas: '250000'
+    }).then(function (receipt){
+      console.log(receipt)
+      if (receipt.status) {
+        spinner.stop();
+        alert("0.1 KLAY가 " + walletInstance.address + " 계정으로 지급되었습니다.");
+        $('#transaction').html('')
+        $('#transaction').append(`<p><a href='https://baobab.klaytnscope.com/tx/${receipt.txHash}' target='_blank'>클레이튼 Scope에서 트랜젝션 확인</a></p>`);
+        return agContract.methods.getBalance().call()
+          .then(function (balance){
+            $('#contractBalance').html("");
+            $('#contractBalance').append('<p>' + '이벤트 잔액: ' + cav.utils.fromPeb(balance, "KLAY") + ' KLAY' + '</p>');
+          })
+      }
+    })
 
   }
 };
