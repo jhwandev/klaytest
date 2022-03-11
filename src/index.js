@@ -9,13 +9,20 @@ const agContract = new cav.klay.Contract(DEPLOYED_ABI, DEPLOYED_ADDRESS);
 
 const App = {
   auth: {
-    accessType: 'keystore',
+    accessType: '',
     keystore: '',
     password: ''
   },
 
+
+  /**
+   * 연결된 session 정보가 있을경우, ui변경하여 정보표시
+   */
   start: async function () {
     const walletFromSession = sessionStorage.getItem('walletInstance');
+
+
+    //kaikas일경우와 분기 필요(cav wallet)
     if (walletFromSession) {
       try {
         cav.klay.accounts.wallet.add(JSON.parse(walletFromSession));
@@ -26,7 +33,13 @@ const App = {
     }
   },
 
+  /**
+   * keystore 유효성
+   */
   handleImport: async function () {
+    
+    this.auth.accessType = 'keystore'
+
     const fileReader = new FileReader();
     fileReader.readAsText(event.target.files[0]);
     fileReader.onload = (event) => {      
@@ -34,7 +47,7 @@ const App = {
         if (!this.checkValidKeystore(event.target.result)) {
           $('#message').text('유효하지 않은 keystore 파일입니다.');
           return;
-        }    
+        }
         this.auth.keystore = event.target.result;
         $('#message').text('keystore 통과. 비밀번호를 입력하세요.');
         document.querySelector('#input-password').focus();    
@@ -45,18 +58,37 @@ const App = {
     }   
   },
 
+  /**
+   * keystore 비밀번호 input onchange event
+   */
   handlePassword: async function () {
     this.auth.password = event.target.value;
   },
 
-  handleLogin: async function () {
+  /**
+   * login 버튼
+   */
+  handleLogin: async function (account) {
+    //keystore
     if (this.auth.accessType === 'keystore') { 
       try {
+        //private key decrypt
         const privateKey = cav.klay.accounts.decrypt(this.auth.keystore, this.auth.password).privateKey;
         this.integrateWallet(privateKey);
-      } catch (e) {      
+      } catch (e) {
         $('#message').text('비밀번호가 일치하지 않습니다.');
       }
+
+    //kaikas
+    }else if(this.auth.accessType === 'kaikas') {
+      try {
+        const publicKey = account;
+        this.integrateWalletKaikas(publicKey);
+        //$('#from').val(publicKey);
+      } catch (e) {
+        $('#message').text('err');
+      }
+
     }
   },
 
@@ -137,6 +169,153 @@ const App = {
     }
   },
 
+  /**
+   * kaikas transaction test
+   */
+  depositTest: async function () {
+    caver.klay
+    .sendTransaction({
+      type: 'VALUE_TRANSFER',
+      from: klaytn.selectedAddress,
+      to: '0x0000000000000000000000000000000000000000',
+      value: caver.utils.toPeb('1', 'KLAY'),
+      gas: 8000000
+    })
+  },
+
+
+  /**
+   * token transfer
+   * @returns 
+   */
+  tokenTransfer: async function() {
+
+
+    const to = $('#to').val();
+    const amount = $('#value').val();
+    const gas = $('#gas').val();
+    const contractAddress = $('#contract').val();
+
+
+    // const { from, contractAddress, to, amount, gas, decimal } = this.state
+    // if (decimal > 20) {
+    //   return alert('decimal should be less than 21')
+    // }
+
+    const data = caver.klay.abi.encodeFunctionCall(
+      {
+        name: 'transfer',
+        type: 'function',
+        inputs: [
+          {
+            type: 'address',
+            name: 'recipient'
+          },
+          {
+            type: 'uint256',
+            name: 'amount'
+          }
+        ]
+      },
+      [
+        to,
+        caver.utils
+          .toBN(amount)
+          .mul(caver.utils.toBN(Number(`1e${decimal}`)))
+          .toString()
+      ]
+    )
+
+    caver.klay
+      .sendTransaction({
+        type: 'SMART_CONTRACT_EXECUTION',
+        from,
+        to: contractAddress,
+        data,
+        gas
+      })
+      .on('transactionHash', transactionHash => {
+        console.log('txHash', transactionHash)
+        this.setState({ txHash: transactionHash })
+      })
+      .on('receipt', receipt => {
+        console.log('receipt', receipt)
+        this.setState({ receipt: JSON.stringify(receipt) })
+      })
+      .on('error', error => {
+        console.log('error', error)
+        this.setState({ error: error.message })
+      })
+  },
+
+  /**
+   * send transaction
+   * klay
+   */
+  sendKlay: async function () {
+
+    const to = $('#to').val();
+    const value = $('#value').val();
+    const gas = $('#gas').val();
+
+    try {
+      caver.klay
+      .sendTransaction({
+        type: 'VALUE_TRANSFER',
+        from: klaytn.selectedAddress,
+        to: to,
+        value: caver.utils.toPeb(value, 'KLAY'),
+        gas: gas
+      })
+      .then(receipt => {
+        if (receipt.status){
+          
+          alert(value + " KLAY를 컨트랙에 송금했습니다.");               
+          console.log(receipt);
+          //location.reload();
+        } else{
+          alert("컨트랙트 실패");               
+        }  
+      })
+    } catch (err) {
+      alert(err.message);
+    }
+  },
+
+  /**
+   * 
+   */
+  valueTransferMemo: async function () {
+
+    const to = $('#to').val();
+    const value = $('#value').val();
+    const gas = $('#gas').val();
+    const memo = $('#memo').val();
+
+
+    caver.klay.sendTransaction({
+      type: 'VALUE_TRANSFER_MEMO',
+      from: klaytn.selectedAddress,
+      to: to,
+      value: caver.utils.toPeb(value.toString(), 'KLAY'),
+      gas: gas,
+      data: memo,
+    })
+      .once('transactionHash', (transactionHash) => {
+        console.log('txHash', transactionHash)
+        //this.setState({ txHash: transactionHash })
+      })
+      .once('receipt', (receipt) => {
+        console.log('receipt', receipt)
+        //this.setState({ receipt: JSON.stringify(receipt) })
+      })
+      .once('error', (error) => {
+        console.log('error', error)
+        //this.setState({ error: error.message })
+      })
+  },
+
+
   callOwner: async function () {
     return await agContract.methods.owner().call();
   },
@@ -161,6 +340,10 @@ const App = {
     return isValidKeystore;
   },
 
+  /**
+   * keystore 로그인시 사용
+   * privatekey 세션에 추가
+   */
   integrateWallet: function (privateKey) {
     const walletInstance = cav.klay.accounts.privateKeyToAccount(privateKey);
     cav.klay.accounts.wallet.add(walletInstance)
@@ -168,6 +351,20 @@ const App = {
     this.changeUI(walletInstance);  
   },
 
+
+  /**
+   * test kaikas 
+   */
+   integrateWalletKaikas: function (publicKey) {
+    const walletInstance = {'address' : publicKey}
+
+    //cav.klay.accounts.wallet.add(walletInstance)
+    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance));
+    this.changeUI(walletInstance);  
+    console.log('inte kaikas');
+  },
+
+  
   reset: function () {
     this.auth = {
       keystore: '',
@@ -175,18 +372,25 @@ const App = {
     };
   },
 
+  /**
+   * 
+   * @param {*} walletInstance 
+   */
   changeUI: async function (walletInstance) {
+
     $('#loginModal').modal('hide');
-    $("#login").hide(); 
+    $("#loginKaikas").hide();
+    $("#login").hide();
     $('#logout').show();
     $('#game').show();
-    $('#address').append('<br>' + '<p>' + '내 계정 주소: ' + walletInstance.address + '</p>');   
-    $('#contractBalance').append('<p>' + '이벤트 잔액: ' + cav.utils.fromPeb(await this.callContractBalance(), "KLAY") + ' KLAY' + '</p>');     
+    //$('#address').append('<br>' + '<p>' + '내 계정 주소: ' + walletInstance.address + '</p>');   
+    //$('#contractBalance').append('<p>' + '이벤트 잔액: ' + cav.utils.fromPeb(await this.callContractBalance(), "KLAY") + ' KLAY' + '</p>');     
 
-    const  contractOwner = await this.callOwner()
+    const contractOwner = await this.callOwner()
     //alert(contractOwner)
     if (contractOwner.toUpperCase() === contractOwner.toUpperCase()) {
-      $("#owner").show(); 
+      $("#owner").show();
+      $("#send").show();
     }     
   },
 
@@ -242,7 +446,109 @@ const App = {
       }
     })
 
+  },
+
+  /**
+   * kaikas login function
+   * @returns 
+   */
+  kaikasLogin: async function() {
+    this.auth.accessType = 'kaikas';
+
+    if(typeof window.klaytn !== 'undefined') {
+    }else{
+      return;
+    }
+    
+    if(window.klaytn.isKaikas) {
+      const accounts = await klaytn.enable();
+      const account = accounts[0]
+      this.handleLogin(account);
+      //console.log(account);
+      this.setAccountInfo();
+    }
+
+    //주소 변경 event
+    klaytn.on('accountsChanged', function(accounts) {
+      //로그아웃?
+      console.log('주소 변경 event : '+accounts);
+      App.setAccountInfo();
+    })
+
+    //this.depositTest();
+    
+
+  },
+
+
+  /**
+   * select event
+   */
+  selectEvent: async function() {
+
+    const selected = $('#selectbox option:selected').val();
+    
+    //reset
+
+    //form
+    $('#contentTitle').text('');
+    $('#fromDiv').hide();
+    $('#toDiv').hide();
+    $('#contractDiv').hide();
+    $('#memoDiv').hide();
+    $('#gasDiv').hide();
+    $('#valueDiv').hide();
+    
+    //button
+    $('#sendBtnDiv').hide();
+    $('#valueTransferMemoBtnDiv').hide();
+    
+
+    if(selected == 'sendKlay') {
+      $('#contentTitle').text('Send Klay');
+      $('#fromDiv').show();
+      $('#toDiv').show();
+      $('#gasDiv').show();
+      $('#valueDiv').show();
+      $('#sendBtnDiv').show();
+      
+    }else if(selected == 'tokenTransfer') {
+      $('#contentTitle').text('token Transfer');
+      $('#fromDiv').show();
+      $('#toDiv').show();
+      $('#contractDiv').show();
+      $('#gasDiv').show();
+      $('#valueDiv').show();
+      $('#sendBtnDiv').show();
+
+    }else if(selected == 'valueTransferMemo'){
+      $('#contentTitle').text('Value Transfer with Memo');
+      $('#fromDiv').show();
+      $('#toDiv').show();
+      $('#memoDiv').show();
+      $('#gasDiv').show();
+      $('#valueDiv').show();
+      $('#valueTransferMemoBtnDiv').show();
+    }
+    
+  },
+
+  setAccountInfo: async function() {
+    const { klaytn } = window
+    if (klaytn === undefined) return
+
+    const account = klaytn.selectedAddress
+    const balance = await caver.klay.getBalance(account)
+
+    $('#from').val(account);
+    $('#from').val(account);
+
+    $('#address').text(account);
+    $('#balance').text(caver.utils.fromPeb(balance, 'KLAY')+' KLAY');
+
   }
+  
+  
 };
 
 window.App = App;

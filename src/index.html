@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <meta name="theme-color" content="#000000">
-  <title>Klaytn Addition Game</title>
+  <title>Klaytn test</title>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
     integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
@@ -19,51 +19,50 @@
   <div class="container">
     <div class="row">
       <div class="col-md-8 col-md-offset-2">       
-        <h1 class="text-center">클레이튼(Klaytn)</h1>
-        <h3 class="text-center">속전속결 덧셈 게임</h1>
-        <h3 class="text-center">
-          <code>3초안에 맞출 시 1 KLAY 지급 이벤트</code>  
+        <h1 class="text-center">Klaytn Test</h1>
+
           <button type="button" 
-                  class="btn btn-info pull-right" 
-                  id="login" 
-                  data-toggle="modal"
-                  data-target="#loginModal">
-                  로그인
+                  class="btn btn-success pull-right" 
+                  id="loginKaikas"
+                  onclick="App.kaikasLogin()">
+                  Kaikas Login
           </button>
           <button type="button" 
-                  class="btn btn-info pull-right" 
+                  class="btn btn-warning pull-right" 
                   id="logout" 
                   style="display: none;"
                   onclick="App.handleLogout()">
-                  로그아웃
+                  logout
           </button>
-        </h3>         
-        <div class="text-center" id="address"></div>   
+
+        <br>
+        <div id="walletInfo"> 
+          <h3>Wallet Information</h3>
+          <span class="">Address : </span>
+          <span id="address"></span>
+          <br>
+          <span class="">Balance : </span>
+          <span id="balance"></span>
+          <span class=""></span>
+        </div>
+        
         <div class="text-center" id="contractBalance"></div> 
         <hr /> 
       </div>
     </div>
 
-    <br />
-    
-    <div class="row text-center">
-      <div id="game" style="display: none;">   
-        <div class="yellow-box" id="start">       
-          <a href="#" onclick="App.generateNumbers()">시작</a>
-        </div>     
-        <div class="yellow-box" id="question" style="display: none;">
-          <span id="num1"></span> + <span id="num2"></span> = ?          
-          <div class="input-group">
-            <input type="number" class="form-control" id="answer" />
-            <span class="input-group-btn">
-              <button type="button" class="btn btn-default" onclick="App.submitAnswer()">제출</button>
-            </span>
-          </div>
-        </div>     
-      </div> 
-    </div>
-
     <br>
+
+    <div class="row text-center">
+      <div class="col-md-4 col-md-offset-4">
+        <select id="selectbox" class="form-control" onchange="App.selectEvent()">
+          <option selected>select</option>
+          <option value="sendKlay">sendKlay</option>
+          <!-- <option value="tokenTransfer">tokenTransfer</option> -->
+          <option value="valueTransferMemo">valueTransferMemo</option>
+        </select>
+      </div>
+    </div>
 
     <div id="spin"></div>    
     <div class="row text-center">
@@ -75,9 +74,74 @@
     </div>
 
     <div class="row text-center">
+      <div class="col-md-4 col-md-offset-4">
+
+        <h3><span id="contentTitle"><br></span></h3>
+        
+        
+        <div id="fromDiv" style="display: none;">
+          <label>From</label>
+          <input id="from" type="text" name="from"
+          placeholder="From Address" class="form-control" autocomplete="off" disabled="disabled">
+          </br>
+        </div>
+        
+
+        <div id="toDiv" style="display: none;">
+          <label>To</label>
+          <input id="to" type="text" name="to" value="0x04a452C0c7f6329D8a7C38820a4384Aa1326a94d"
+          placeholder="To Address" class="form-control" autocomplete="off">
+          </br>
+        </div>
+
+        <div id="contractDiv" style="display: none;">
+          <label>Contract Address (Token Address)</label>
+          <input id="contract" type="text" name="value"
+          placeholder="contract address" class="form-control" autocomplete="off">
+          </br>
+        </div>
+        
+        <div id="valueDiv" style="display: none;">
+          <label>Value (Amount)</label>
+          <input id="value" type="text" name="value"
+          placeholder="Value (or amount)" class="form-control" autocomplete="off">
+          </br>
+        </div>
+
+        <div id="memoDiv" style="display: none;">
+          <label>Memo</label>
+          <input id="memo" type="text" name="value"
+          placeholder="Memo" class="form-control" autocomplete="off">
+          </br>
+        </div>
+
+        <div id="gasDiv" style="display: none;">
+          <label>Gas</label>
+          <input id="gas" type="text" name="gas" value="3000000"
+            placeholder="Gas (Peb)" class="form-control" autocomplete="off">
+          <br>
+        </div>
+
+        <div id="sendBtnDiv" style="display: none;" onClick="App.sendKlay()">
+          <button type="button" class="btn btn-info" id="send">
+            send
+          </button>
+        </div>
+
+        <div id="valueTransferMemoBtnDiv" style="display: none;" onClick="App.valueTransferMemo()">
+          <button type="button" class="btn btn-info" id="send">
+            send
+          </button>
+        </div>
+
+      </div>       
+    </div>
+
+    <div class="row text-center">
       <div class="col-md-2 col-md-offset-5">
-        <div id="owner" style="display: none;">        
-          <label>컨트랙에 KLAY 보내기</label>
+        <div id="send" style="display: none;">        
+          <label>Value Transfer</label>
+          <input type="text" class="form-control" id="amount" />
           <div class="input-group">             
             <input type="number" class="form-control" id="amount" />
             <span class="input-group-btn">
@@ -154,4 +218,6 @@
       opacity: 1;
     }
   }
+
+  
 </style>
