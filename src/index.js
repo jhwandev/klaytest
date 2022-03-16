@@ -1,11 +1,28 @@
 import Caver from "caver-js";
 import {Spinner} from 'spin.js';
+import Web3 from "web3";
 
 const config = {
   rpcURL: 'https://api.baobab.klaytn.net:8651'
 }
 const cav = new Caver(config.rpcURL);
+const web3 = new Web3(window.ethereum);
+
 const agContract = new cav.klay.Contract(DEPLOYED_ABI, DEPLOYED_ADDRESS);
+
+//set ipfs
+//param - (string ipfsnode url, number port, boolean(https:false, http:true))
+cav.ipfs.setIPFSNode('localhost', 5001, true);
+
+//test
+const myNFT = new cav.klay.KIP17('0x3c23cbB340dF53B93c286AB4D3FD7B7c518Bd879');
+
+
+
+
+
+
+
 
 const App = {
   auth: {
@@ -15,10 +32,48 @@ const App = {
   },
 
 
+
+  ttt: async function() {
+
+
+    const user = '0xCd28FDC46D44fDBc667B81D88C3794696D0ecfA7';
+    
+    //주어진 계정 주소의 잔액을 반환 - 해당 컨트랙(mynft인스턴스)에 해당하는 느프트 몇개 가지고 있는지
+    const nftBanance = await myNFT.balanceOf(user);
+    
+    var nftList = []
+    var nftNo = '';
+    var nft = '';
+
+    
+    for (var i=0; i < nftBanance; i++) {
+      nftNo = await myNFT.tokenOfOwnerByIndex(user, i);
+      nft = await myNFT.tokenURI(nftNo);
+      nft = nft.split('ipfs://')[1]
+      
+      nftList.push('https://'+nft);
+    }
+
+    //https://ipfs.io/ipfs/QmbjEWgbA9wMZqXbFVqAWfVAcd4vSjtmW3YbC6DtpRCE5V/1.json
+    //ipfs://QmbjEWgbA9wMZqXbFVqAWfVAcd4vSjtmW3YbC6DtpRCE5V/1.json"
+    console.log(nftList);
+
+  },
+
   /**
    * 연결된 session 정보가 있을경우, ui변경하여 정보표시
    */
   start: async function () {
+    
+    this.ttt();
+
+    // var tokenList = []
+    // for (let i; i < myNFT.balanceOf(myAddress); i++) {
+    // tokenList.push(myNFT.tokenOfOwnerByIndex(myAddress, i))
+    // }
+
+    // console.log("My tokens: ", tokenList)
+
     const walletFromSession = sessionStorage.getItem('walletInstance');
 
 
@@ -89,7 +144,18 @@ const App = {
         $('#message').text('err');
       }
 
+    //metaMask
+    }else if(this.auth.accessType === 'metamask') {
+      console.log('etherwallet access');
+      try {
+        const publicKey = account;
+        this.integrateWalletMetamask(publicKey);
+        //$('#from').val(publicKey);
+      } catch (e) {
+        $('#message').text('err');
+      }
     }
+
   },
 
   handleLogout: async function () {
@@ -361,7 +427,16 @@ const App = {
     //cav.klay.accounts.wallet.add(walletInstance)
     sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance));
     this.changeUI(walletInstance);  
-    console.log('inte kaikas');
+  },
+  /**
+   * test metamask 
+   */
+   integrateWalletMetamask: function (publicKey) {
+    const walletInstance = {'address' : publicKey}
+
+    //cav.klay.accounts.wallet.add(walletInstance)
+    sessionStorage.setItem('walletInstance', JSON.stringify(walletInstance));
+    this.changeUI(walletInstance); 
   },
 
   
@@ -380,6 +455,7 @@ const App = {
 
     $('#loginModal').modal('hide');
     $("#loginKaikas").hide();
+    $('#loginMetamask').hide();
     $("#login").hide();
     $('#logout').show();
     $('#game').show();
@@ -454,10 +530,14 @@ const App = {
    */
   kaikasLogin: async function() {
     this.auth.accessType = 'kaikas';
-
+    
     if(typeof window.klaytn !== 'undefined') {
     }else{
       return;
+    }
+
+    if(klaytn.networkVersion!='1001'){
+
     }
     
     if(window.klaytn.isKaikas) {
@@ -471,16 +551,127 @@ const App = {
     //주소 변경 event
     klaytn.on('accountsChanged', function(accounts) {
       //로그아웃?
-      console.log('주소 변경 event : '+accounts);
+      console.log('주소 변경 event : '+ accounts);
       App.setAccountInfo();
     })
 
     //this.depositTest();
-    
+  },
 
+  metamaskLogin: async function() {
+    this.auth.accessType = 'metamask';
+    
+    if(typeof window.ethereum !== 'undefined') {
+    }else{
+      return;
+    }
+
+    const chainId = ethereum.chainId;
+
+    if(chainId != '0x3e9') {
+      await this.switchMetamaskNetwork();
+      return;
+    }else{
+      
+    }
+    
+    if(window.ethereum.isMetaMask) {
+      //const accounts = await ethereum.enable(); //deprecated
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      const account = accounts[0]
+      console.log(account);
+
+      this.handleLogin(account);
+      console.log(account);
+      this.setAccountInfoMeta();
+    }
+
+    //주소 변경 event
+    klaytn.on('accountsChanged', function(accounts) {
+      //로그아웃?
+      console.log('주소 변경 event : '+accounts);
+      App.setAccountInfoMeta();
+    })
+
+    //this.depositTest();
+  },
+
+  /**
+   * metamask network switch
+   */
+  switchMetamaskNetwork: async function() {
+
+    //baobab testnet
+    try {
+      await ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x3e9' }],
+      });
+    } catch (switchError) {
+      // This error code indicates that the chain has not been added to MetaMask.
+      if (switchError.code === 4902) {
+        try {
+          await ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0x3e9',
+                chainName: 'Baobab',
+                nativeCurrency: {
+                  name: 'Klaytn',
+                  symbol: 'KLAY',
+                  decimals: 18
+                },
+                rpcUrls: ['https://kaikas.baobab.klaytn.net:8651/'],
+                blockExplorerUrls: ['https://baobab.scope.klaytn.com/']
+              },
+            ],
+          });
+        } catch (addError) {
+          // handle "add" error
+        }
+      }
+      // handle other "switch" errors
+    }
   },
 
 
+  /**
+   * switch metamask network to cypress(klaytn)
+   */
+  switchMetamaskNetworkToCypress: async function() {
+    try {
+      await ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x2019' }],
+      });
+    } catch (switchError) {
+      // This error code indicates that the chain has not been added to MetaMask.
+      if (switchError.code === 4902) {
+        try {
+          await ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0x2019',
+                chainName: 'cypress',
+                nativeCurrency: {
+                  name: 'Klaytn',
+                  symbol: 'KLAY',
+                  decimals: 18
+                },
+                rpcUrls: ['https://kaikas.baobab.klaytn.net:8651/'],
+                blockExplorerUrls: ['https://scope.klaytn.com']
+              },
+            ],
+          });
+        } catch (addError) {
+          // handle "add" error
+        }
+      }
+      // handle other "switch" errors
+    }
+  },
   /**
    * select event
    */
@@ -545,6 +736,22 @@ const App = {
 
     $('#address').text(account);
     $('#balance').text(caver.utils.fromPeb(balance, 'KLAY')+' KLAY');
+
+  },
+  setAccountInfoMeta: async function() {
+    const { ethereum } = window
+    if (ethereum === undefined) return
+
+    const account = ethereum.selectedAddress
+    const balance = await web3.eth.getBalance(account)
+
+    console.log(balance+'  --');
+
+    $('#from').val(account);
+    $('#from').val(account);
+
+    $('#address').text(account);
+    $('#balance').text(web3.utils.fromWei(balance)+' KLAY');
 
   }
   
